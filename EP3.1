@@ -1,0 +1,204 @@
+#lang racket
+
+; *This program allows you to run two functions that simulate behaviors of
+; Deterministic Finite Automata and Non-Deterministic Finite Automata
+; *1º: run-dfa, which receives the initial state, list of transitions,
+; the automaton's end states' list and the input chain. Sumarized:
+; (run-dfa state transitions endstates chain)
+; *2º: run-nda, same as run-dfa, but for non-deterministic automata.
+; Receives a list of initial states (normally should be one, its recursive
+; implemention, however, justifies this), a list of transitions,
+; and just like run-dfa a list of endstates and entry chain:
+; (run-nda state-list transitions endstates chain)
+
+; Definitions
+;    Here the null chain is defined for a more explicit usage on run-nda
+(define nil '())
+;    The transitions for the dfa used as an example for this exercise
+(define trans-dfa (list (list 'q0 'a 'q1)
+                        (list 'q0 'b 'q2)
+                        (list 'q1 'a 'q0)
+                        (list 'q1 'b 'q2)
+                        (list 'q2 'a 'q2)
+                        (list 'q2 'b 'q0)))
+;    End states' list
+(define end-dfa (list 'q2))
+;    Entry chain for the dfa
+;(define t-chain-dfa (list 'a 'a 'b 'a))
+
+;    The transitions for the nda used for this exercise
+(define trans-nda (list (list 'q0 'a 'q1)
+                        (list 'q0 'a 'q2)
+                        (list 'q0 'b 'q2)
+                        (list 'q0 'nil 'q2)
+                        (list 'q1 'a 'q0)
+                        (list 'q1 'b 'q2)
+                        (list 'q1 'nil 'q1)
+                        (list 'q2 'a 'q2)
+                        (list 'q2 'b 'q0)
+                        (list 'q2 'nil 'q2)))
+;    Nda's end states' list
+(define end-nda (list 'q0 'q2))
+;    And nda's entry chain
+(define t-chain-nda (list 'a 'nil 'a 'nil 'nil 'b 'nil 'b 'b))
+
+;    *run-dfa will print every transition made by automata and
+;    its current state before such transition.
+;    *It returns false (#f) if the automata did not reach an end
+;    state after all of the entry chain has been read and if
+;    automata do not have a transition that will lead to an
+;    end state.
+;    *Returns true (#t) if all of the entry chain has been read
+;    and the current state is a member of the end states' list.
+;    *Enters another recursion if entry chain is not null, as
+;    it reads the rest of the chain (rest chain) per recursion.
+;    *Please note that the function filter was used to keep the
+;    language's functionality (racket), as it keeps the program
+;    from using append* and local variable instances. It could
+;    also be implemented by using assoc with lambda for selection,
+;    without the same effect, though (would need auxiliary functions).
+
+(define (run-dfa state transitions endstates chain)
+  (cond
+    [(false? (or (assoc state transitions) (member state endstates))) #f]
+    [(false? (not (and (member state endstates) (null? chain)))) #t]
+    [else
+     (printf "Current State->\t~s\n" state)
+     (cond
+       [(null? chain) #f]
+       [else (printf "Transition:\t~s\n" (assoc state
+                                                (filter
+                                                 (lambda (listmatch)
+                                                   (equal? (first chain) (list-ref listmatch 1))
+                                                 ) trans-dfa
+                                                )
+                                          )
+             )
+             (run-dfa
+              (list-ref
+               (assoc state
+                      (filter
+                       (lambda (listmatch) (equal? (first chain) (list-ref listmatch 1)))
+                      trans-dfa
+                       )
+               ) 2
+              ) transitions endstates (rest chain)
+             )
+        ]
+       )
+     ]  
+    )
+)
+
+;    *run-nda will print every transition made by automata and
+;    its current state before such transition, as run-dfa did.
+;    *It returns false (#f) if the automata did not reach an end
+;    state after all of the entry chain has been read, if
+;    automata do not have a transition that will lead to an
+;    end state and if state-list is a null list.
+;    *Returns true (#t) if all of the entry chain has been read
+;    and the current state is a member of the end states' list.
+;    *Enters another recursion if entry chain is not null, as
+;    it reads the rest of the chain (rest chain) per recursion.
+;    - Now the part where it gets tricky:
+;    *Differently then dfa it needs a list of states to which a
+;    transition is possible and fits a recursion accordingly,
+;    both for the state-list's list and chain's list.
+;    *Please note that the function filter was used to keep the
+;    language's functionality (racket), as it keeps the program
+;    from using append* and local variable instances. It could
+;    also be implemented by using assoc with lambda for selection,
+;    without the same effect, though (would need auxiliary functions).
+
+(define (run-nda state-list transitions endstates chain)
+  (cond
+    [(null? state-list) #f]
+    [(false? (or (assoc (first state-list) transitions)
+                 (member (first state-list) endstates)))
+     (run-nda (rest state-list) transitions endstates chain)]
+    [(false? (not (and (member (first state-list) endstates)
+                       (null? chain)))) #t]
+    [else
+     (printf "Current State->\t~s\n" state-list)
+     (cond
+       [(null? chain) #f]
+       [else
+             (cond
+               [(false? (assoc (first state-list) 
+                                                (filter
+                                                 (lambda (listmatch)
+                                                   (equal? (first chain) (list-ref listmatch 1))
+                                                 ) trans-nda
+                                                )
+                         )
+                 )
+                (run-nda 
+                 (list
+                  (list-ref
+                   (build-list
+                        (length
+                              (filter
+                               (lambda (listmatch) (equal? (first chain) (list-ref listmatch 1)))
+                               trans-nda
+                              )
+                        )
+                        (lambda (nlists)
+                          (first (list-ref
+                                  (filter
+                                   (lambda (listmatch) (equal? (first chain) (list-ref listmatch 1)))
+                                  trans-nda
+                                  ) nlists
+                                 )
+                          )
+                        )
+                       )
+                      )
+                     ) transitions endstates (rest chain)
+                    )]
+               [else (printf "Transitions:\t~s\n"
+                             (assoc (first state-list) 
+                                                (filter
+                                                 (lambda (listmatch)
+                                                   (equal? (first chain) (list-ref listmatch 1))
+                                                 ) trans-nda
+                                                )
+                              )
+                     )
+                     (run-nda
+                      (list
+                       (list-ref
+                        (assoc (first state-list)
+                              (filter
+                               (lambda (listmatch) (equal? (first chain) (list-ref listmatch 1)))
+                               trans-nda
+                              )
+                        ) 2
+                       )
+                      )transitions endstates (rest chain)
+                     )]
+             )]  
+      )]
+    )
+)
+
+(printf" *This program allows you to run two functions that simulate behaviors of
+ Deterministic Finite Automata and Non-Deterministic Finite Automata
+ *1º: run-dfa, which receives the initial state, list of transitions,
+ the automaton's end states' list and the input chain. Sumarized:
+ (run-dfa state transitions endstates chain)
+ *2º: run-nda, same as run-dfa, but for non-deterministic automata.
+ Receives a list of initial states (normally should be one, its recursive
+ implemention, however, justifies this), a list of transitions,
+ and just like run-dfa a list of endstates and entry chain:
+ (run-nda state-list transitions endstates chain)\n")
+
+; Execution:
+(printf "\n Deterministic Finite Automaton;\n\t -> example for entry chain (a a a b): returns true (#t) <-\n")
+(run-dfa 'q0 trans-dfa end-dfa (list 'a 'a 'a 'b))
+(printf "\n Same Deterministic Finite Automaton; \n\t -> example for entry chain (a a a a): returns false (#t) <-\n")
+(run-dfa 'q0 trans-dfa end-dfa (list 'a 'a 'a 'a))
+
+(printf "\n Non-Deterministic Finite Automaton;\n\t -> example for entry chain (a () () b b): returns true (#t) <-\n")
+(run-nda (list 'q0) trans-nda end-nda (list 'a 'nil 'nil 'b 'b))
+(printf "\n Same Non-Deterministic Finite Automaton;\n\t -> example for entry chain (a () ()): returns false (#f) <-\n")
+(run-nda (list 'q0) trans-nda end-nda (list 'a 'nil 'nil))
